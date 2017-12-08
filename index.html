@@ -38,6 +38,7 @@
         // });
 
         /** Chat App */
+        var roomNo;
         var socket = io();
         function setUsername() {
             socket.emit('setUsername', document.getElementById('name').value);
@@ -55,9 +56,13 @@
         function sendMessage() {
             var msg = document.getElementById('message').value;
             if(msg) {
-                socket.emit('msg', {message: msg, user: user});
+                socket.emit('msg', {message: msg, user: user, roomNo: roomNo});
             }
         }
+        socket.on('connectToRoom',function(data) {
+            roomNo = data.roomNo;
+            console.log(roomNo);
+        });
         socket.on('newmsg', function(data) {
             if(user) {
                 document.getElementById('message-container').innerHTML += '<div><b>' + 

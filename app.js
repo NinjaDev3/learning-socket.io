@@ -81,22 +81,34 @@ app.get('*',function(req,res){
 
 /** Chat App */
 users = [];
+var roomno = 1;
 io.on('connection', function(socket) {
     console.log('A user connected');
+
     socket.on('setUsername', function(data) {
         console.log(data);
         
         if(users.indexOf(data) > -1) {
-            socket.emit('userExists', data + ' username is taken! Try some other username.');
+            socket.emit('userExists', data + ' Username is taken! Try some other username.');
         } else {
             users.push(data);
             socket.emit('userSet', {username: data});
+            
+            // Increase room no if 2 clients are present in a room.
+            if (io.sockets.adapter.rooms["room-"+roomno] && io.sockets.adapter.rooms["room-"+roomno].length > 1) {
+                roomno++;
+            }
+            socket.join("room-"+roomno);
+
+            //Send this event to everyone in the room.
+            io.sockets.in("room-"+roomno)
+                .emit('connectToRoom', { roomNo: roomno });
         }
     });
     
     socket.on('msg', function(data) {
-        //Send message to everyone
-        io.sockets.emit('newmsg', data);
+        //Send message to everyone in that particular room
+        io.sockets.in("room-"+data.roomNo).emit('newmsg', data);
     })
 });
 
