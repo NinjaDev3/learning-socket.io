@@ -96,7 +96,6 @@ io.on('connection', function(socket) {
         // Api call to create room for client and agents
         axios.post('http://3c.local/api/v1/add-chat-user', data)
             .then(function (res) {
-                console.log(res.data);
                 if(res.data.status) {
                     var resp  = res.data.response;
                     console.log('Emiting Event from to vue: clientAddedToRoom')
@@ -121,12 +120,12 @@ io.on('connection', function(socket) {
     });
 
     // Event emited by agents when they want to get added to some rooms
-    socket.on('add-agents-to-rooms', function(rooms) {
+    socket.on('add-agent-to-room', function(room) {
     //    if(io.nsps['/'].adapter.rooms["room-"+roomno] && io.nsps['/'].adapter.rooms["room-"+roomno].length > 1) roomno++;
         
         console.log('Node: Add To Rooms ', rooms);
         for (var i = 0, len = rooms.length; i < len; i++) {
-            if(socket.rooms.indexOf(rooms[i]) < 0) {
+            if(socket.rooms.indexOf(room[i].name) < 0) {
                 socket.join(rooms[i].name);
                 socket.emit('agent-added-to-room', rooms[i]);
             }
@@ -140,8 +139,13 @@ io.on('connection', function(socket) {
     //    TODO: API calls to get data of all agent_id and rooms they are assigned to with status
         axios.get('http://3c.local/api/v1/get-agents')
         .then(function (res) {
-            console.log(res.data);
-            io.sockets.emit('new-rooms-added', res.data.response);
+            console.log(res.data.status)
+            if(res.data.status) {
+                console.log('Node : New Rooms Added ', res.data.response);
+                io.sockets.emit('new-rooms-added', res.data.response);
+            } else {
+                console.log(res);
+            }
         })
         .catch(function (err) {
             console.log(err);
