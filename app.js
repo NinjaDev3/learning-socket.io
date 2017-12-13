@@ -2,6 +2,26 @@ var app = require('express')();
 var http = require('http').Server(app);
 var path = require('path');
 var io = require('socket.io')(http);
+var axios = require('axios');
+
+app.use(function(req, res, next) {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+    next();
+});
+
+// app.use((req, res, next) => {
+//     res.header("Access-Control-Allow-Origin", "*");
+//     res.header(
+//         "Access-Control-Allow-Headers",
+//         "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+//     );
+//     if (req.method === 'OPTIONS') {
+//         res.header('Access-Control-Allow-Methods', 'PUT, POST, PATCH, DELETE, GET');
+//         return res.status(200).json({});
+//     }
+//     next();
+// });
 
 app.get('*',function(req,res){
     res.sendFile(path.join(__dirname + '/index.html'))
@@ -80,11 +100,82 @@ app.get('*',function(req,res){
 // });
 
 /** Chat App */
-users = [];
-var roomno = 1;
 io.on('connection', function(socket) {
-    console.log('A user connected');
+    console.log('User connected');
 
+    // Event emited when a client connects
+    socket.on('client-connected', function(data) {
+        console.log('Node: Client Connected: ', data);
+        // Api call to create room for client and agents
+        axios.post('http://3c.local/api/v1/add-chat-user', data)
+            .then(function (res) {
+                if(res.data.status) {
+                    var resp  = res.data.response;
+                    console.log('Emiting Event from to vue: clientAddedToRoom')
+                    socket.emit('clientAddedToRoom', resp);
+                    socket.join(resp.room_number);
+                    io.sockets.in(resp.room_number).emit('connectedToRoom', "We are connecting you to an agent");
+                    console.log('Joined client to room : ', resp.room_number);
+                    sendRooms();
+                } else {
+                    console.log(res)
+                }
+            })
+            .catch(function (err) {
+                console.log(err);
+            });
+                    
+    });
+
+    // Event emited when an agent gets connected
+    socket.on('get-added-rooms', function(data) {
+        console.log('Node: Get Added Rooms ', data);
+        sendRooms();
+    });
+
+    // Event emited by agents when they want to get added to some rooms
+    socket.on('add-to-rooms', function(rooms) {
+    //    if(io.nsps['/'].adapter.rooms["room-"+roomno] && io.nsps['/'].adapter.rooms["room-"+roomno].length > 1) roomno++;
+        
+        console.log('Node: Add To Rooms ', rooms);
+        for (var i = 0, len = rooms.length; i < len; i++) {
+            if(socket.rooms.indexOf(rooms[i]) < 0) {
+                socket.join(rooms[i]);
+            }
+        }
+    });
+
+    // API call to get all the agent list and the list of rooms they are assigned to with status.
+    var sendRooms = function() {
+        setTimeout(function() {
+            // TODO: API calls to get data of all agent_id and rooms they are assigned to with status
+            var roomsData = [
+                {
+                    agent_id: 10,
+                    rooms: [
+                        {
+                            "name": "bedroom",
+                            "status": 2
+                        },
+                        {
+                            "name": "bathroom",
+                            "status": 2
+                        },
+                        {
+                            "name": "kitchen",
+                            "status": 1
+                        }
+                        // ...
+                    ]
+                }
+                // ...
+            ];
+            socket.emit('new-rooms-added', roomsData);
+        }, 500);
+    }
+
+    ///////////////////////////////////////////////
+    
     socket.on('setUsername', function(data) {
         console.log(data);
         
@@ -105,9 +196,9 @@ io.on('connection', function(socket) {
                 .emit('connectToRoom', { roomNo: roomno });
         }
     });
-    
+
     socket.on('msg', function(data) {
-        //Send message to everyone in that particular room
+        // Send message to everyone in that particular room
         io.sockets.in("room-"+data.roomNo).emit('newmsg', data);
     })
 });

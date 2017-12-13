@@ -40,6 +40,9 @@
         /** Chat App */
         var roomNo;
         var socket = io();
+        socket.on('connect', function() {
+            socket.emit('client-connected', { data: "some data" });
+        });
         function setUsername() {
             socket.emit('setUsername', document.getElementById('name').value);
         };
