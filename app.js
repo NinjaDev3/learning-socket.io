@@ -1,90 +1,8 @@
 var app = require('express')();
 var http = require('http').Server(app);
-var path = require('path');
 var io = require('socket.io')(http);
 var axios = require('axios');
 
-app.use(function(req, res, next) {
-    res.header("Access-Control-Allow-Origin", "*");
-    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-    next();
-});
-
-app.get('*',function(req,res){
-    res.sendFile(path.join(__dirname + '/index.html'))
-});
-
-// //Whenever someone connects this gets executed
-// io.on('connection', function(socket) {
-//     console.log('A user connected');
-
-//     // //Send a message after a timeout of 4seconds
-//     // setTimeout(function() {
-//     //     socket.send('Sent a message 4seconds after connection!');
-//     // }, 4000);
-
-//     //Send a message when 
-//     setTimeout(function() {
-//         //Sending an object when emmiting an event
-//         socket.emit('testerEvent', { description: 'A custom event named testerEvent!'});
-//     }, 4000);
-
-//     socket.on('clientEvent', function(data) {
-//         console.log(data);
-//      });
-    
-//     //Whenever someone disconnects this piece of code executed
-//     socket.on('disconnect', function () {
-//        console.log('A user disconnected');
-//     });
-//  });
-
-/** Brodcase message to evrey connected client */
-// var clients = 0;
-// io.on('connection', function(socket) {
-//     console.log('Client Connected');
-//     clients++;
-//     io.sockets.emit('broadcast',{ description: clients + ' clients connected!'});
-//     socket.on('disconnect', function () {
-//         console.log('Client Disconnected');
-//         clients--;
-//         io.sockets.emit('broadcast',{ description: clients + ' clients connected!'});
-//     });
-// });
-
-/** Brodcase message to evrey connected client except the client that emited the event */
-// var clients = 0;
-// io.on('connection', function(socket) {
-//    clients++;
-//    socket.emit('newclientconnect',{ description: 'Hey, welcome!'});
-//    socket.broadcast.emit('newclientconnect',{ description: clients + ' clients connected!'})
-//    socket.on('disconnect', function () {
-//       clients--;
-//       socket.broadcast.emit('newclientconnect',{ description: clients + ' clients connected!'})
-//    });
-// });
-
-/** Namespacing */
-// var nsp = io.of('/my-namespace');
-// nsp.on('connection', function(socket) {
-//    console.log('someone connected');
-//    nsp.emit('hi', 'Hello everyone!');
-// });
-
-/** Connect to rooms */
-// var roomno = 1;
-// io.on('connection', function(socket) {
-
-//    //Increase roomno if 2 clients are present in a room.
-//    if(io.nsps['/'].adapter.rooms["room-"+roomno] && io.nsps['/'].adapter.rooms["room-"+roomno].length > 1) roomno++;
-//    socket.join("room-"+roomno);
-
-//    //Send this event to everyone in the room.
-//    io.sockets.in("room-"+roomno).emit('connectToRoom', "You are in room no. "+roomno);
-//     socket.on('disconnect', function () { 
-//         // socket.leave("room-"+roomno);
-//     });
-// });
 
 /** Chat App */
 io.on('connection', function(socket) {
@@ -102,10 +20,12 @@ io.on('connection', function(socket) {
                     socket.emit('clientAddedToRoom', resp);
                     socket.join(resp.room_number);
                     io.sockets.in(resp.room_number).emit('connectedToRoom', "We are connecting you to an agent");
-                    console.log('Joined client to room : ', resp.room_number);
+                    console.log(resp.name + 'is joined  to room : ', resp.room_number);
+                    io.sockets.in(resp.room_number).emit('updateRoom', resp);
                     sendRooms();
                 } else {
-                    console.log(res)
+                    console.log(res);
+                    io.sockets.in(socket.id).emit('clientNotAddedToRoom');
                 }
             })
             .catch(function (err) {
@@ -153,9 +73,24 @@ io.on('connection', function(socket) {
     }
 
     socket.on('msg', function(data) {
-        // Send message to everyone in that particular room
-        io.sockets.in(data.roomNo).emit('newmsg', data);
-    });
+        
+        console.log('message sent');
+        console.log(data);
+        /**api call to add message to the database */
+        axios.post(data.widgetHost+ '/api/v1/add-messages', data)
+            .then(function (response) {
+                if(response.data.status) {
+                    // Send message to everyone in that particular room
+                    console.log(response.data.response);
+                    io.sockets.in(data.roomNumber)
+                        .emit('newmsg',data);
+                }
+            })
+            .catch(function (error) {
+                console.log(error);
+            });
+
+    });   
 
     /////////////////////////////////////////////////////////////////
     
@@ -180,10 +115,15 @@ io.on('connection', function(socket) {
         }
     });
 
-    // socket.on('msg', function(data) {
-    //     // Send message to everyone in that particular room
-    //     io.sockets.in("room-"+data.roomNo).emit('newmsg', data);
-    // })
+    /** on socket disconnection */
+    socket.on('disconnect', function()  {
+        console.log(socket.id,'disconnected');
+        
+        io.sockets.in(socket.id).emit('disconnect');
+        socket.disconnect();
+    });   
+
+    
 });
 
 http.listen(3000, function() {
