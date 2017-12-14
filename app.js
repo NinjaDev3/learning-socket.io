@@ -115,19 +115,19 @@ io.on('connection', function(socket) {
 
     // Event emited when an agent gets connected
     socket.on('get-added-rooms', function() {
-        console.log('Node: Get Added Rooms ');
+        console.log('Node: Get Added Rooms');
         sendRooms();
     });
 
     // Event emited by agents when they want to get added to some rooms
-    socket.on('add-agent-to-room', function(room) {
+    socket.on('add-agent-to-rooms', function(rooms) {
     //    if(io.nsps['/'].adapter.rooms["room-"+roomno] && io.nsps['/'].adapter.rooms["room-"+roomno].length > 1) roomno++;
-        
-        console.log('Node: Add To Rooms ', rooms);
+        console.log('Node: Add Agent To Rooms ', rooms);
         for (var i = 0, len = rooms.length; i < len; i++) {
-            if(socket.rooms.indexOf(room[i].name) < 0) {
+            if(!(rooms[i].name in socket.rooms)) {
                 socket.join(rooms[i].name);
                 socket.emit('agent-added-to-room', rooms[i]);
+                console.log('Agent Added To Room ', rooms[i].name);
             }
         }
     });
@@ -138,18 +138,17 @@ io.on('connection', function(socket) {
 
     //    TODO: API calls to get data of all agent_id and rooms they are assigned to with status
         axios.get('http://3c.local/api/v1/get-agents')
-        .then(function (res) {
-            console.log(res.data.status)
-            if(res.data.status) {
-                console.log('Node : New Rooms Added ', res.data.response);
-                io.sockets.emit('new-rooms-added', res.data.response);
-            } else {
-                console.log(res);
-            }
-        })
-        .catch(function (err) {
-            console.log(err);
-        });
+            .then(function (res) {
+                if(res.data.status) {
+                    console.log('Node : New Rooms Added ', res.data.response);
+                    io.sockets.emit('new-rooms-added', res.data.response);
+                } else {
+                    console.log(res);
+                }
+            })
+            .catch(function (err) {
+                console.log(err);
+            });
     }
 
     socket.on('msg', function(data) {
@@ -157,7 +156,7 @@ io.on('connection', function(socket) {
         io.sockets.in(data.roomNo).emit('newmsg', data);
     });
 
-    /////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////////////////////////////
     
     socket.on('setUsername', function(data) {
         console.log(data);
