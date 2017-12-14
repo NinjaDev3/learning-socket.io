@@ -128,6 +128,9 @@ io.on('connection', function(socket) {
                 socket.join(rooms[i].name);
                 socket.emit('agent-added-to-room', rooms[i]);
                 console.log('Agent Added To Room ', rooms[i].name);
+                if (rooms[i].status == 1) {
+                    io.sockets.in(rooms[i].name).emit('msg-of-acceptance', "You have to 'ACCEPT' or 'REJECT' this Message!");
+                }
             }
         }
     });
